@@ -87,7 +87,11 @@ func New(db *pgxpool.Pool) *Writer {
 
 // Write persists an audit entry. Failures are logged but never propagated —
 // an audit write failure must not affect the outcome of the request it records.
+// Write is a no-op when the Writer has no database pool (e.g., in unit tests).
 func (w *Writer) Write(ctx context.Context, e Entry) {
+	if w.db == nil {
+		return
+	}
 	meta, err := json.Marshal(e.Metadata)
 	if err != nil {
 		slog.ErrorContext(ctx, "audit: failed to marshal metadata",
