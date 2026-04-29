@@ -1,0 +1,64 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  # Only explicitly enabled linters run. This avoids surprise failures when
+  # golangci-lint adds new linters in future releases.
+  disable-all: true
+  enable:
+    - errcheck        # unchecked error returns
+    - gosimple        # simplification opportunities
+    - govet           # go vet checks
+    - ineffassign     # ineffectual assignments
+    - staticcheck     # comprehensive static analysis
+    - unused          # unused code
+    - bodyclose       # HTTP response bodies not closed
+    - gosec           # security anti-patterns
+    - noctx           # net/http calls without context
+    - revive          # general Go style
+    - exhaustive      # missing cases in switches on typed enums
+    - nilerr          # returning nil alongside an error
+    - errorlint       # errors.Is/As usage
+    - predeclared     # shadowing of predeclared identifiers
+
+linters-settings:
+  errcheck:
+    # Audit log writes are fire-and-forget by design — suppress those.
+    exclude-functions:
+      - (*github.com/q04-oss/whisked-platform/internal/audit.Writer).Write
+
+  gosec:
+    excludes:
+      - G115 # integer conversion — we control all conversions explicitly
+
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+        arguments:
+          - checkPrivateReceivers: true
+      - name: var-naming
+        severity: warning
+      - name: error-return
+        severity: warning
+      - name: error-strings
+        severity: warning
+      - name: unused-parameter
+        severity: warning
+
+  exhaustive:
+    # Only enforce exhaustiveness where we define the enum ourselves.
+    default-signifies-exhaustive: true
+
+issues:
+  # Fail on any finding — warnings are errors in this codebase.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Test files get relaxed errcheck — mock methods often ignore errors intentionally.
+    - path: "_test\\.go"
+      linters:
+        - errcheck
+        - gosec

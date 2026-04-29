@@ -94,4 +94,39 @@ The security posture is documented in [THREAT_MODEL.md](docs/THREAT_MODEL.md). K
 
 The server is hosted on Railway. Deployments are triggered by pushes to `main` after CI passes. The Dockerfile produces a minimal Alpine image.
 
+**Migrations run automatically at server startup** — the migration files are embedded in the binary. No separate migration step is needed on Railway.
+
+### Railway setup (first deploy)
+
+1. Create a Railway project and add a PostgreSQL database and Redis instance.
+
+2. Set the following environment variables on the server service:
+
+   | Variable | Notes |
+   |---|---|
+   | `DATABASE_URL` | Provided by Railway Postgres plugin |
+   | `REDIS_URL` | Provided by Railway Redis plugin |
+   | `JWT_SECRET` | ≥32 random characters |
+   | `HMAC_SHARED_KEY` | Shared with the iOS app |
+   | `ADMIN_PIN` | ≥8 chars, not all same character |
+   | `SHOPIFY_WEBHOOK_SECRET` | From Shopify Partners dashboard |
+   | `ANTHROPIC_API_KEY` | Optional — enables brand chat |
+   | `OTEL_EXPORTER_OTLP_ENDPOINT` | Optional — enables distributed tracing |
+
+3. Deploy. Migrations apply automatically on first start.
+
+4. Create the first staff account using the seed command:
+
+   ```bash
+   # Run locally with production DATABASE_URL
+   DATABASE_URL="<railway-postgres-url>" make seed \
+     EMAIL=admin@whisked.ca \
+     NAME="Belle" \
+     PASSWORD=yoursecurepassword
+   ```
+
+### Subsequent deploys
+
+Push to `main`. Railway redeploys automatically after CI passes. Migrations apply on startup — `ErrNoChange` is treated as success.
+
 See the [CI workflow](.github/workflows/ci.yml) for the full gate: vet, staticcheck, gosec, govulncheck, race tests.

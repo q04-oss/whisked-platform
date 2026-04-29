@@ -29,6 +29,17 @@ migrate:
 migrate-down:
 	migrate -path db/migrations -database "$(DATABASE_URL)" down 1
 
+# ── Seed ──────────────────────────────────────────────────────────────────────
+# Creates the first admin staff account. Run once after migrations.
+# Example: make seed EMAIL=admin@whisked.ca NAME="Belle" PASSWORD=yourpassword
+
+seed:
+	go run ./cmd/seed \
+	  -email="$(EMAIL)" \
+	  -name="$(NAME)" \
+	  -password="$(PASSWORD)" \
+	  -role=admin
+
 # ── Quality gates (mirrors CI) ────────────────────────────────────────────────
 
 vet:
