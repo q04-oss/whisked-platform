@@ -24,6 +24,10 @@ type Config struct {
 	// iOS request signing — all mobile requests must carry a valid HMAC.
 	HMACSharedKey Secret
 
+	// Shopify — verifies orders/paid webhook authenticity.
+	// If not set, the webhook endpoint returns 503.
+	ShopifyWebhookSecret Secret
+
 	// Anthropic — powers the brand chat experience on the website.
 	AnthropicAPIKey Secret
 
@@ -50,8 +54,9 @@ func Load() (*Config, error) {
 		AdminPIN:      get("ADMIN_PIN"),
 
 		// Optional
-		AnthropicAPIKey: NewSecret(os.Getenv("ANTHROPIC_API_KEY")),
-		Port:            optionalInt("PORT", 8080),
+		ShopifyWebhookSecret: NewSecret(os.Getenv("SHOPIFY_WEBHOOK_SECRET")),
+		AnthropicAPIKey:      NewSecret(os.Getenv("ANTHROPIC_API_KEY")),
+		Port:                 optionalInt("PORT", 8080),
 	}
 
 	if len(missing) > 0 {
