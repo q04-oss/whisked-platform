@@ -21,10 +21,11 @@ const (
 	argonKeyLength   = 32
 )
 
-// hashPassword hashes a plaintext password with Argon2id.
+// HashPassword hashes a plaintext password with Argon2id.
+// Exported for use by the dashboard domain when creating staff accounts.
 // Returns a self-describing hash string that includes all parameters,
 // so future parameter changes don't invalidate existing hashes.
-func hashPassword(password string) (string, error) {
+func HashPassword(password string) (string, error) {
 	salt := make([]byte, argonSaltLength)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("generating salt: %w", err)
@@ -49,9 +50,10 @@ func hashPassword(password string) (string, error) {
 	), nil
 }
 
-// verifyPassword checks a plaintext password against an Argon2id hash string.
-// Uses constant-time comparison to prevent timing attacks.
-func verifyPassword(password, encoded string) (bool, error) {
+// VerifyPassword checks a plaintext password against an Argon2id hash string.
+// Exported so the dashboard domain can verify staff passwords without
+// reimplementing Argon2id. Uses constant-time comparison to prevent timing attacks.
+func VerifyPassword(password, encoded string) (bool, error) {
 	parts := strings.Split(encoded, "$")
 	// Expected format: $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
 	if len(parts) != 6 {

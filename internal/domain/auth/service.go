@@ -39,7 +39,7 @@ func (s *Service) Register(ctx context.Context, params RegisterParams) (*TokenPa
 
 	params.Email = normalizeEmail(params.Email)
 
-	hash, err := hashPassword(params.Password)
+	hash, err := HashPassword(params.Password)
 	if err != nil {
 		return nil, fmt.Errorf("auth.Register: hashing password: %w", err)
 	}
@@ -92,7 +92,7 @@ func (s *Service) Login(ctx context.Context, params LoginParams) (*TokenPair, er
 		return nil, platform.ErrUnauthenticated
 	}
 
-	ok, err := verifyPassword(params.Password, customer.passwordHash)
+	ok, err := VerifyPassword(params.Password, customer.passwordHash)
 	if err != nil || !ok {
 		s.audit.Write(ctx, audit.Entry{
 			EventType: audit.EventAuthLoginFailed,
