@@ -29,15 +29,25 @@ type Config struct {
 	ShopifyWebhookSecret Secret
 
 	// Square — payment processing and customer directory.
-	// SquareAccessToken:       used to call the Square Customers API.
-	// SquareWebhookSigningKey: verifies Square webhook authenticity.
-	// SquareLocationID:        the Square location ID for the Jasper Ave bar.
-	// If not set, Square integration is disabled — loyalty QR validation still works.
-	SquareAccessToken       Secret
+	//
+	// OAuth flow (preferred):
+	//   SquareAppID + SquareAppSecret drive the OAuth connect/callback endpoints.
+	//   Tokens are stored in the database after Belle completes the one-time
+	//   OAuth flow at GET /v1/square/oauth/connect.
+	//
+	// Legacy static token (fallback, used before OAuth is completed):
+	//   SquareAccessToken is used when no OAuth token is in the database.
+	//   Once OAuth is complete this variable can be removed.
+	//
+	// SquareWebhookSigningKey: verifies Square webhook payload authenticity.
+	// SquareNotificationURL must exactly match the webhook URL in Square dashboard.
+	SquareAppID            string
+	SquareAppSecret        Secret
+	SquareOAuthRedirectURL string
+	SquareAccessToken      Secret // legacy — superseded by OAuth tokens in DB
 	SquareWebhookSigningKey Secret
 	SquareLocationID        string
-	// SquareNotificationURL must exactly match the webhook URL in Square dashboard.
-	SquareNotificationURL string
+	SquareNotificationURL   string
 
 	// Anthropic — powers the brand chat experience on the website.
 	AnthropicAPIKey Secret
@@ -66,6 +76,9 @@ func Load() (*Config, error) {
 
 		// Optional
 		ShopifyWebhookSecret:    NewSecret(os.Getenv("SHOPIFY_WEBHOOK_SECRET")),
+		SquareAppID:             os.Getenv("SQUARE_APP_ID"),
+		SquareAppSecret:         NewSecret(os.Getenv("SQUARE_APP_SECRET")),
+		SquareOAuthRedirectURL:  os.Getenv("SQUARE_OAUTH_REDIRECT_URL"),
 		SquareAccessToken:       NewSecret(os.Getenv("SQUARE_ACCESS_TOKEN")),
 		SquareWebhookSigningKey: NewSecret(os.Getenv("SQUARE_WEBHOOK_SIGNING_KEY")),
 		SquareLocationID:        os.Getenv("SQUARE_LOCATION_ID"),

@@ -1,5 +1,5 @@
-# Binaries
-server
+# Compiled binary output (root only — does not affect cmd/server/ or internal/server/)
+/server
 *.exe
 
 # Environment
