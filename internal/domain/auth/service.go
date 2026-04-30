@@ -3,12 +3,14 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
 
 	"github.com/q04-oss/whisked-platform/internal/audit"
 	"github.com/q04-oss/whisked-platform/internal/config"
+	"github.com/q04-oss/whisked-platform/internal/integrations/square"
 	"github.com/q04-oss/whisked-platform/internal/platform"
 )
 
@@ -16,19 +18,21 @@ import (
 type repository interface {
 	createCustomerWithCredentials(ctx context.Context, email, displayName, passwordHash string) (*authenticatedCustomer, error)
 	getCustomerByEmailWithHash(ctx context.Context, email string) (*authenticatedCustomer, error)
+	linkSquareCustomer(ctx context.Context, customerID platform.CustomerID, squareCustomerID string) error
 }
 
 // Service handles registration, login, token refresh, and logout.
 type Service struct {
-	repo  repository
-	redis *redis.Client
-	cfg   *config.Config
-	audit *audit.Writer
+	repo   repository
+	redis  *redis.Client
+	cfg    *config.Config
+	audit  *audit.Writer
+	square *square.Client // nil when Square is not configured
 }
 
 // NewService returns a Service wired to its dependencies.
-func NewService(repo repository, rdb *redis.Client, cfg *config.Config, audit *audit.Writer) *Service {
-	return &Service{repo: repo, redis: rdb, cfg: cfg, audit: audit}
+func NewService(repo repository, rdb *redis.Client, cfg *config.Config, audit *audit.Writer, sq *square.Client) *Service {
+	return &Service{repo: repo, redis: rdb, cfg: cfg, audit: audit, square: sq}
 }
 
 // Register creates a new customer account and returns a token pair.
@@ -50,6 +54,29 @@ func (s *Service) Register(ctx context.Context, params RegisterParams) (*TokenPa
 			return nil, platform.ErrConflict
 		}
 		return nil, fmt.Errorf("auth.Register: %w", err)
+	}
+
+	// Create a Square customer record linked by email so future Square payments
+	// automatically credit loyalty steeps. Non-blocking — Square being down
+	// or unconfigured must not prevent account creation.
+	if s.square != nil {
+		go func() {
+			sqCustomer, err := s.square.CreateCustomer(context.Background(), customer.email, customer.displayName)
+			if err != nil {
+				slog.Error("auth.Register: Square customer creation failed",
+					"customer_id", customer.id,
+					"error", err,
+				)
+				return
+			}
+			if err := s.repo.linkSquareCustomer(context.Background(), customer.id, sqCustomer.ID); err != nil {
+				slog.Error("auth.Register: linking Square customer failed",
+					"customer_id", customer.id,
+					"square_customer_id", sqCustomer.ID,
+					"error", err,
+				)
+			}
+		}()
 	}
 
 	pair, refreshJTI, err := issueTokenPair(customer.id, s.cfg.JWTSecret.Expose())

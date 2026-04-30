@@ -184,6 +184,39 @@ func (r *PGXRepository) getCustomerIDByEmail(ctx context.Context, email string) 
 	return platform.CustomerID(rawID), nil
 }
 
+type stampPageCustomer struct {
+	ID          platform.CustomerID
+	DisplayName string
+	Email       string
+}
+
+func (r *PGXRepository) getCustomerIDBySquareID(ctx context.Context, squareCustomerID string) (platform.CustomerID, error) {
+	var rawID int64
+	err := r.db.QueryRow(ctx,
+		`SELECT id FROM customers WHERE square_customer_id = $1`, squareCustomerID,
+	).Scan(&rawID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, platform.ErrNotFound
+		}
+		return 0, err
+	}
+	return platform.CustomerID(rawID), nil
+}
+
+func (r *PGXRepository) getCustomerForStampPage(ctx context.Context, id platform.CustomerID) (stampPageCustomer, error) {
+	var c stampPageCustomer
+	var rawID int64
+	err := r.db.QueryRow(ctx,
+		`SELECT id, display_name, email FROM customers WHERE id = $1`, id.Int64(),
+	).Scan(&rawID, &c.DisplayName, &c.Email)
+	if err != nil {
+		return stampPageCustomer{}, err
+	}
+	c.ID = platform.CustomerID(rawID)
+	return c, nil
+}
+
 func isDuplicateIdempotencyKey(err error) bool {
 	return strings.Contains(err.Error(), "unique") &&
 		strings.Contains(err.Error(), "idempotency_key")

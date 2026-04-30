@@ -73,6 +73,14 @@ func (r *PGXRepository) getCustomerByEmailWithHash(ctx context.Context, email st
 	return &c, nil
 }
 
+func (r *PGXRepository) linkSquareCustomer(ctx context.Context, customerID platform.CustomerID, squareCustomerID string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE customers SET square_customer_id = $2 WHERE id = $1`,
+		customerID.Int64(), squareCustomerID,
+	)
+	return err
+}
+
 // isDuplicateEmail detects a PostgreSQL unique constraint violation on email.
 func isDuplicateEmail(err error) bool {
 	return strings.Contains(err.Error(), "unique") &&

@@ -31,3 +31,12 @@ SELECT EXISTS(
 -- Used by the Shopify webhook to link an order to a customer.
 -- The loyalty domain does not import the customers package — it owns this query.
 SELECT id FROM customers WHERE email = $1;
+
+-- name: GetCustomerIDBySquareID :one
+-- Used by the Square payment webhook to automatically credit steeps when
+-- a Square payment is matched to a Whisked account.
+SELECT id FROM customers WHERE square_customer_id = $1;
+
+-- name: GetCustomerForStampPage :one
+-- Returns the minimal customer info shown on the staff QR stamp page.
+SELECT id, display_name, email FROM customers WHERE id = $1;

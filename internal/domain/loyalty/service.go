@@ -24,6 +24,8 @@ type repository interface {
 	redeemInTransaction(ctx context.Context, customerID platform.CustomerID, idempotencyKey string) error
 	getHistory(ctx context.Context, customerID platform.CustomerID, limit, offset int) ([]Event, error)
 	getCustomerIDByEmail(ctx context.Context, email string) (platform.CustomerID, error)
+	getCustomerIDBySquareID(ctx context.Context, squareCustomerID string) (platform.CustomerID, error)
+	getCustomerForStampPage(ctx context.Context, id platform.CustomerID) (stampPageCustomer, error)
 }
 
 // Service contains the business logic for the loyalty program.
@@ -170,6 +172,73 @@ func (s *Service) ProcessShopifyOrder(ctx context.Context, orderID, email string
 	if earnErr != nil {
 		// Log but don't surface — the webhook must still return 200.
 		return fmt.Errorf("loyalty.ProcessShopifyOrder: %w", earnErr)
+	}
+
+	return nil
+}
+
+// IssueStampToken generates a short-lived QR token for the customer.
+// The token is displayed as a QR code in the iOS app and scanned by staff
+// to validate that a drink was purchased. Single-use, 5-minute TTL.
+func (s *Service) IssueStampToken(ctx context.Context, customerID platform.CustomerID) (*StampToken, error) {
+	return issueStampToken(ctx, s.redis, customerID)
+}
+
+// StampViaToken validates a QR token and records a steep for the customer.
+// Called when staff scan a customer's QR code. Returns the customer info
+// for display on the staff's confirmation page.
+func (s *Service) StampViaToken(ctx context.Context, token string) (*stampPageCustomer, error) {
+	customerID, err := redeemStampToken(ctx, s.redis, token)
+	if err != nil {
+		return nil, platform.ErrNotFound
+	}
+
+	customer, err := s.repo.getCustomerForStampPage(ctx, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("loyalty.StampViaToken: %w", err)
+	}
+
+	idemKey := fmt.Sprintf("qr-%s", token)
+	if _, err := s.Earn(ctx, EarnParams{
+		CustomerID:     customerID,
+		Source:         "in_bar",
+		IdempotencyKey: idemKey,
+	}); err != nil {
+		return nil, fmt.Errorf("loyalty.StampViaToken: %w", err)
+	}
+
+	s.audit.Write(ctx, audit.Entry{
+		EventType:  audit.EventSteepEarned,
+		ActorType:  audit.ActorSystem,
+		ActorID:    ptr(customerID.Int64()),
+		TargetType: ptr("customer"),
+		TargetID:   ptr(customerID.String()),
+		Metadata:   map[string]string{"method": "qr_scan"},
+	})
+
+	return &customer, nil
+}
+
+// ProcessSquarePayment credits a steep when a Square payment.completed event
+// is received and the Square customer ID matches a Whisked account.
+// Always returns nil — Square webhooks must receive 200 regardless of outcome.
+func (s *Service) ProcessSquarePayment(ctx context.Context, squarePaymentID, squareCustomerID string) error {
+	if squareCustomerID == "" {
+		return nil
+	}
+
+	customerID, err := s.repo.getCustomerIDBySquareID(ctx, squareCustomerID)
+	if err != nil {
+		return nil // Customer not linked — no loyalty credit.
+	}
+
+	idemKey := fmt.Sprintf("square-%s", squarePaymentID)
+	if _, err := s.Earn(ctx, EarnParams{
+		CustomerID:     customerID,
+		Source:         "in_bar",
+		IdempotencyKey: idemKey,
+	}); err != nil {
+		return fmt.Errorf("loyalty.ProcessSquarePayment: %w", err)
 	}
 
 	return nil

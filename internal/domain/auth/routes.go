@@ -17,6 +17,7 @@ func Router(state *app.State) http.Handler {
 			state.Redis,
 			state.Config,
 			state.Audit,
+			state.Square,
 		),
 	}
 

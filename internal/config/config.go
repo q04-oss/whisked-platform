@@ -28,6 +28,17 @@ type Config struct {
 	// If not set, the webhook endpoint returns 503.
 	ShopifyWebhookSecret Secret
 
+	// Square — payment processing and customer directory.
+	// SquareAccessToken:       used to call the Square Customers API.
+	// SquareWebhookSigningKey: verifies Square webhook authenticity.
+	// SquareLocationID:        the Square location ID for the Jasper Ave bar.
+	// If not set, Square integration is disabled — loyalty QR validation still works.
+	SquareAccessToken       Secret
+	SquareWebhookSigningKey Secret
+	SquareLocationID        string
+	// SquareNotificationURL must exactly match the webhook URL in Square dashboard.
+	SquareNotificationURL string
+
 	// Anthropic — powers the brand chat experience on the website.
 	AnthropicAPIKey Secret
 
@@ -54,9 +65,13 @@ func Load() (*Config, error) {
 		AdminPIN:      get("ADMIN_PIN"),
 
 		// Optional
-		ShopifyWebhookSecret: NewSecret(os.Getenv("SHOPIFY_WEBHOOK_SECRET")),
-		AnthropicAPIKey:      NewSecret(os.Getenv("ANTHROPIC_API_KEY")),
-		Port:                 optionalInt("PORT", 8080),
+		ShopifyWebhookSecret:    NewSecret(os.Getenv("SHOPIFY_WEBHOOK_SECRET")),
+		SquareAccessToken:       NewSecret(os.Getenv("SQUARE_ACCESS_TOKEN")),
+		SquareWebhookSigningKey: NewSecret(os.Getenv("SQUARE_WEBHOOK_SIGNING_KEY")),
+		SquareLocationID:        os.Getenv("SQUARE_LOCATION_ID"),
+		SquareNotificationURL:   os.Getenv("SQUARE_NOTIFICATION_URL"),
+		AnthropicAPIKey:         NewSecret(os.Getenv("ANTHROPIC_API_KEY")),
+		Port:                    optionalInt("PORT", 8080),
 	}
 
 	if len(missing) > 0 {

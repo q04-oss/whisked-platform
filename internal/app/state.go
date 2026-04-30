@@ -10,6 +10,7 @@ import (
 
 	"github.com/q04-oss/whisked-platform/internal/audit"
 	"github.com/q04-oss/whisked-platform/internal/config"
+	"github.com/q04-oss/whisked-platform/internal/integrations/square"
 	"github.com/q04-oss/whisked-platform/internal/telemetry"
 )
 
@@ -23,6 +24,7 @@ type State struct {
 	Telemetry *telemetry.Provider
 	Audit     *audit.Writer
 	HTTP      *http.Client
+	Square    *square.Client // nil when SQUARE_ACCESS_TOKEN is not configured
 }
 
 // NewState constructs the application state from its dependencies.
@@ -32,14 +34,14 @@ func NewState(
 	cfg *config.Config,
 	tel *telemetry.Provider,
 ) *State {
+	httpClient := &http.Client{Timeout: 30 * time.Second}
 	return &State{
 		DB:        db,
 		Redis:     rdb,
 		Config:    cfg,
 		Telemetry: tel,
 		Audit:     audit.New(db),
-		HTTP: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		HTTP:      httpClient,
+		Square:    square.NewFromConfig(cfg.SquareAccessToken.Expose(), httpClient),
 	}
 }
